@@ -94,11 +94,14 @@ AWS_DEFAULT_REGION="ap-southeast-1" \
 
 The alarm and log group are deleted at the end. CloudWatch custom metrics cannot be manually deleted; they expire automatically after retention.
 
-## Next BytePlus implementation
+## BytePlus Cloud Monitor
 
-Add BytePlus Cloud Monitor and TLS inside `tools.py`:
+The server also exposes `get_byteplus_metric_data` and `get_byteplus_alert_groups`, implemented in `byteplus_tools.py` using the official BytePlus SDK. Install the optional dependencies with:
 
-- Cloud Monitor: `GetMetricData`
-- TLS: `SearchLogs`
+```bash
+.venv/bin/python -m pip install -r requirements-byteplus.txt
+```
 
-Keep credentials in the tool server environment or Vault. Do not pass cloud access keys through the agent prompt.
+Configure `BYTEPLUS_ACCESS_KEY`, `BYTEPLUS_SECRET_KEY`, and, for temporary credentials, `BYTEPLUS_SESSION_TOKEN` in the MCP server environment. These are BytePlus cloud credentials, not a ModelArk API key. Do not include credentials in prompts or commit them to the repository.
+
+See [BytePlus monitoring setup and validation](docs/byteplus-monitoring.md). These dedicated tools do not use the AWS/mock `provider` switch. BytePlus TLS log search is not implemented.

@@ -35,8 +35,22 @@ MCP 代码不需要部署在 MA 内。MA 通过 MCP 协议调用远端工具；M
 | --- | --- |
 | 本地 MCP Client → 本地 MCP Server → AWS | 已实测成功，读取到合成告警和 ERROR 日志，随后清理测试资源 |
 | MA Cloud → 外部 AWS 监控 MCP + Bearer 认证 | 2026-09-11 已完成 EC2 + EIP + HTTPS + Vault 的端到端实测，两个工具调用成功，读取到测试告警与日志 |
+| MA Cloud → 同一外部 MCP → BytePlus Cloud Monitor | 2026-09-11 已完成真实 ECS 指标和告警历史查询，两个工具均成功 |
 
 AWS 实测会话为 `sesn-20260911121220-nrq7x`。MA 调用 `get_cloud_incident_context` 和 `summarize_cloud_incident`，两次结果均为 `is_error=false`，AWS 查询无错误，最终以 `end_turn` 正常结束。MCP 使用 EC2 实例角色访问 AWS。告警和日志为合成测试数据；摘要中的 `high` 是示例规则的输出，不代表发生了真实事故或已验证根因。
+
+### BytePlus 监控验证
+
+同一台 EC2 上的 MCP 也已接入 BytePlus Cloud Monitor，链路为 `MA Cloud → HTTPS + Vault → EC2 MCP → BytePlus Cloud Monitor`。AWS 查询使用 EC2 实例角色；BytePlus 查询使用独立的云账号凭据，保存在服务器受限环境文件中，不进入 MA 提示词。
+
+- 会话：`sesn-20260911124232-zt82l`
+- Agent：`agent-20260911124217-qtxhw`，主模型为 `seed-2-0-lite-260428`
+- 工具：`get_byteplus_metric_data`、`get_byteplus_alert_groups`
+- 结果：两次 MCP 结果均为 `is_error=false`，内部 API 结果均为 `ok=true`，会话以 `end_turn` 正常结束。
+- 指标：近 30 分钟返回 29 个 CPU User 数据点，最小值 3.24%，最大值 4.39%，最新值 3.48%（Unix 时间戳 `1789130520`）。
+- 告警：同一资源近 60 分钟的告警历史页返回 0 条，服务未提供 `total_count`。
+
+本次查询的是既有 BytePlus ECS 的真实数据，没有创建故障或修改资源。CPU User 仅表示用户态 CPU；空告警页也不能证明整体健康。MCP 的部署云与被监控云可以不同，关键是网络可达和各自的认证权限。具体安装、参数和 MA 任务示例见 [BytePlus 接入说明（英文）](byteplus-monitoring.md)。
 
 ## 3. 当前代码提供哪些工具
 
@@ -44,6 +58,8 @@ AWS 实测会话为 `sesn-20260911121220-nrq7x`。MA 调用 `get_cloud_incident_
 | --- | --- |
 | `get_cloud_incident_context` | 获取 AWS 身份信息、当前 ALARM 状态的指标告警、指定日志组近期匹配日志 |
 | `summarize_cloud_incident` | 基于上述结果生成规则化摘要，供 MA 进一步解释 |
+| `get_byteplus_metric_data` | 查询 BytePlus 指定资源的监控指标，需要安装可选 BytePlus SDK |
+| `get_byteplus_alert_groups` | 查询 BytePlus 指定资源和时间范围的告警历史页 |
 
 实现文件：[`server.py`](../server.py)、[`tools.py`](../tools.py)。
 

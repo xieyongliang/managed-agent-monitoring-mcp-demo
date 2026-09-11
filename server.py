@@ -6,9 +6,12 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from tools import get_incident_context, summarize_incident
+from byteplus_tools import get_byteplus_alert_groups, get_byteplus_metric_data
 
 
 mcp = FastMCP("cloud-monitoring-demo")
+mcp.tool()(get_byteplus_alert_groups)
+mcp.tool()(get_byteplus_metric_data)
 
 
 @mcp.tool()

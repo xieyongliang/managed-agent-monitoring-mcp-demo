@@ -37,8 +37,22 @@ The MCP code does not need to run inside MA. MA calls remote tools through the M
 | --- | --- |
 | Local MCP client → local MCP server → AWS | Tested successfully: retrieved a synthetic alarm and ERROR log, then cleaned up the test resources |
 | MA Cloud → externally deployed AWS monitoring MCP with Bearer authentication | Tested end to end on 2026-09-11 using EC2, an EIP, HTTPS, and Vault; both tools succeeded and returned the test alarm and log |
+| MA Cloud → the same external MCP → BytePlus Cloud Monitor | Tested on 2026-09-11 against real ECS metrics and alarm history; both tools succeeded |
 
 The AWS test session is `sesn-20260911121220-nrq7x`. MA called `get_cloud_incident_context` and `summarize_cloud_incident`; both results had `is_error=false`, AWS queries returned no errors, and the turn ended normally with `end_turn`. The MCP server accessed AWS through the EC2 instance role. The alarm and log were synthetic test data. The summary's `high` severity is a demo rule output, not evidence of an actual incident or a verified root cause.
+
+### BytePlus Monitoring Verification
+
+The same EC2-hosted MCP also connects to BytePlus Cloud Monitor: `MA Cloud → HTTPS + Vault → EC2 MCP → BytePlus Cloud Monitor`. AWS queries use the EC2 instance role. BytePlus queries use separate cloud credentials stored in a restricted server environment file, outside the MA prompt.
+
+- Session: `sesn-20260911124232-zt82l`
+- Agent: `agent-20260911124217-qtxhw`, using `seed-2-0-lite-260428`
+- Tools: `get_byteplus_metric_data` and `get_byteplus_alert_groups`
+- Both MCP results had `is_error=false` and inner API results had `ok=true`; the turn ended normally with `end_turn`.
+- Metrics: 29 CPU User datapoints over 30 minutes, minimum 3.24%, maximum 4.39%, latest 3.48% at Unix timestamp `1789130520`.
+- Alarms: the same resource's 60-minute alarm-history page returned zero entries; the service did not supply `total_count`.
+
+These were real observations from an existing BytePlus ECS instance, with no fault injection or resource modification. CPU User covers user-mode CPU only, and an empty alarm page does not prove overall health. The MCP hosting cloud can differ from the monitored cloud, provided network access and the appropriate credentials are available. See [BytePlus setup, parameters, and MA task examples](byteplus-monitoring.md).
 
 ## 3. Available Tools and Current Scope
 
@@ -46,6 +60,8 @@ The AWS test session is `sesn-20260911121220-nrq7x`. MA called `get_cloud_incide
 | --- | --- |
 | `get_cloud_incident_context` | Retrieves AWS identity information, metric alarms currently in ALARM state, and recent matching events from a specified log group |
 | `summarize_cloud_incident` | Produces a rule-based summary of that context for MA to interpret further |
+| `get_byteplus_metric_data` | Queries a specific BytePlus resource metric; requires the optional BytePlus SDK |
+| `get_byteplus_alert_groups` | Queries a page of BytePlus alarm history for a resource and time window |
 
 Implementation: [`server.py`](../server.py) and [`tools.py`](../tools.py).
 

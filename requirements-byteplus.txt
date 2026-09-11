@@ -1,0 +1,2 @@
+-r requirements.txt
+byteplus-python-sdk-v2==3.0.60
