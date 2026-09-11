@@ -4,6 +4,8 @@ This is a minimal runnable example for a Managed Agent monitoring POC.
 
 For the full walkthrough and verified AWS E2E result, see [`docs/managed-agent-monitoring-poc.md`](docs/managed-agent-monitoring-poc.md).
 
+For external AWS MCP deployment, HTTPS authentication, and MA Cloud integration, see [Accessing an External AWS Monitoring MCP Server from MA (English)](docs/ma-external-aws-monitoring-mcp.en.md) or the [Chinese version](docs/ma-external-aws-monitoring-mcp.md).
+
 The demo has two layers:
 
 - `tools.py`: provider-specific monitoring functions. It can run without MCP.
