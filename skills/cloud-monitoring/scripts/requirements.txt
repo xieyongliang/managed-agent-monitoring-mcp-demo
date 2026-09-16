@@ -1,0 +1,2 @@
+boto3>=1.34,<2
+byteplus-python-sdk-v2==3.0.60

@@ -6,6 +6,11 @@ For the full walkthrough and verified AWS E2E result, see [`docs/managed-agent-m
 
 For external AWS MCP deployment, HTTPS authentication, and MA Cloud integration, see [Accessing an External AWS Monitoring MCP Server from MA (English)](docs/ma-external-aws-monitoring-mcp.en.md) or the [Chinese version](docs/ma-external-aws-monitoring-mcp.md).
 
+For monitoring directly inside MA Cloud without an MCP server, see the
+[Skill + config.env customer demo walkthrough (Chinese)](docs/ma-monitoring-skill-config-env-demo.zh-CN.md)
+or [English version](docs/ma-monitoring-skill-config-env-demo.en.md),
+and [Skill validation notes (English)](docs/ma-monitoring-skill.md).
+
 The demo has two layers:
 
 - `tools.py`: provider-specific monitoring functions. It can run without MCP.

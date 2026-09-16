@@ -14,7 +14,7 @@ def _client(region: str):
     ak = os.getenv("BYTEPLUS_ACCESS_KEY", "")
     sk = os.getenv("BYTEPLUS_SECRET_KEY", "")
     if not ak or not sk:
-        raise ValueError("BytePlus cloud credentials are not configured on the MCP server")
+        raise ValueError("BytePlus cloud credentials are not configured in the execution environment")
     config = byteplussdkcore.Configuration()
     config.ak = ak
     config.sk = sk
