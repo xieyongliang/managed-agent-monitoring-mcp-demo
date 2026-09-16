@@ -107,7 +107,7 @@ arkcli agent model list --format json
 
 使用最小权限、优先短期有效的凭据。AWS 查询涉及 `GetCallerIdentity`、`DescribeAlarms`、`FilterLogEvents`；BytePlus 涉及 `GetMetricData`、`ListAlertGroup`。具体 IAM 策略由客户管理员按实际服务、资源与组织策略配置，本文不提供未经验证的通用策略。
 
-**安全边界：**普通 `config.env` 是可通过配置接口读取的数据，不能当作 Vault。能执行脚本的 Agent 也可以访问这些环境变量。禁止把密钥写进 Skill、系统提示词、聊天、setup script、Git 或演示截图。不要使用 root 凭据做客户 Demo；本次测试中发现 AWS 身份为 root，后续必须替换。
+**安全边界：**普通 `config.env` 是可通过配置接口读取的数据，不是专用密钥存储。能执行脚本的 Agent 也可以访问这些环境变量。禁止把密钥写进 Skill、系统提示词、聊天、setup script、Git 或演示截图。不要使用 root 凭据做客户 Demo；本次测试中发现 AWS 身份为 root，后续必须替换。
 
 ## 5. 复现流程
 
@@ -326,23 +326,20 @@ arkcli agent env get <ENVIRONMENT_ID> --format json --transform Result.Id
 
 删除 MA 资源**不等于撤销云 AK/SK，也不证明平台内部备份或日志立即清除**。按客户安全要求撤销临时凭据或轮换已分享的长期密钥。
 
-## 6. 完整测试过程与诊断依据
+## 6. Skill 与 config.env 测试过程
 
 | 阶段 | 做了什么 | 观察结果 | 可以得出的结论 |
 | --- | --- | --- | --- |
 | 1. Skill 打包及加载 | 上传五文件 ZIP，在 MA 运行脚本、安装 boto3 和 BytePlus SDK | 加载及依赖安装成功；self-test 返回 synthetic=true、live_query=false | MA 能运行 Skill；尚未验证真实查询 |
 | 2. 无凭据测试 | 调用 BytePlus 查询；增加布尔型 credential-status | 凭据不存在，真实查询失败；版本 2 不再要求输出环境变量内容 | 本机 SSO 不会自动给 MA 提供云监控凭据 |
 | 3. 本机凭据对照 | 在本机用原始凭据做 AWS STS 和 BytePlus 指标查询 | STS 成功；BytePlus 返回 29 个真实数据点 | 原始凭据在当时有效；不等于 MA 查询成功 |
-| 4. Vault 环境变量测试 | 将相同凭据通过专用 Vault 注入 MA | 变量存在，但 AWS 返回 InvalidClientTokenId / UnrecognizedClientException；BytePlus 返回 InvalidAuthorization | 不能仅凭这些错误断言原始凭据过期 |
-| 5. 非敏感 canary 测试 | 用无权限随机值对比原始 SHA256、HMAC 与沙箱计算结果 | Vault 沙箱值的 SHA256 和 HMAC 均不匹配原值 | 本次 Vault 模式没有让本地 SDK 看到原始签名值 |
-| 6. HTTP 回显对照 | 向测试回显服务发送 canary，检查 header/body | HTTP 200，但沙箱看到的回显仍匹配沙箱值而非原值 | 不能排除响应侧再次掩码，不能据此断言出站替换是否执行 |
-| 7. config.env canary 对照 | 将无权限测试值直接放入 Environment config.env | 原值比对成功、HMAC 比对成功；Vault 对照仍不匹配 | config.env 在本次环境中支持原值注入和本地签名 |
-| 8. config.env 真实查询 | 使用相同 Agent/Skill，专用 Environment，执行双方真实只读 API | BytePlus 指标、告警与 AWS 身份、告警、日志均查询成功 | Skill 直接访问云监控的链路已跑通，不依赖 MCP |
-| 9. 证据与清理 | 保留脱敏工具事件，删除含凭据的测试 Session/Environment | 删除成功，回查不可获取；本地 5 项回归测试通过 | 实验闭环完成，但原始云凭据仍需独立管理 |
+| 4. config.env canary 验证 | 将无权限测试值直接放入 Environment config.env | 原值比对成功、HMAC 比对成功 | config.env 在本次环境中支持原值注入和本地签名 |
+| 5. config.env 真实查询 | 使用专用 Environment 和挂载 Skill 的 Agent，执行双方真实只读 API | BytePlus 指标、告警与 AWS 身份、告警、日志均查询成功 | Skill 直接访问云监控的链路已跑通，不依赖 MCP |
+| 6. 证据与清理 | 保留脱敏工具事件，删除含凭据的测试 Session/Environment | 删除成功，回查不可获取；本地 5 项回归测试通过 | 实验闭环完成，但原始云凭据仍需独立管理 |
 
 测试期间还纠正了两类问题：早期 Agent 尝试了不安全的环境变量检查方式，当时没有注入真实凭据；版本 2 增加了布尔型检查。一次 canary 探针误把 `config.env` 当成文件名，该无效结果已丢弃，后续对照均从 `os.environ` 读取变量。
 
-**最终诊断：**不是“Skill 不支持云监控”，而是 SDK 本地签名需要原始 AK/SK；本次测试的 Vault 路径没有提供原值。换成 config.env 后，同一 Agent/Skill 的真实查询成功。这个结论只覆盖所测试的凭据类型和模式，不代表所有 Vault 模式都不可用，也没有完整验证 Vault 的出站替换协议。
+**测试结论：**通过 config.env 提供运行时凭据后，MA 内的 Skill 可以使用 SDK 完成本地签名，直接查询 AWS 和 BytePlus 的真实监控数据，不需要额外部署 MCP Server。
 
 ## 7. 客户演示顺序与话术
 
@@ -378,8 +375,8 @@ arkcli agent env get <ENVIRONMENT_ID> --format json --transform Result.Id
 ## 9. 参考与交付清单
 
 - [MA Environment 配置文档](https://ai.byteplus.com/ark/region:ap-southeast-1/docs/ModelArk/2553721)：本次用于确认 config.env 的配置方式。
-- 同仓库 `docs/ma-monitoring-skill.md`：英文技术测试记录，包含诊断 Session 引用。
-- 本文：客户演示流程与完整测试经过，不包含实际账号密钥或客户资源参数。
+- [英文客户指南](ma-monitoring-skill-config-env-demo.en.md)：对应的 Skill + config.env 演示文档。
+- 本文：客户演示流程与 Skill + config.env 测试经过，不包含实际账号密钥或客户资源参数。
 - 私有脱敏事件：本次保留用于复核，不默认打包或提交到公开仓库。
 
 对外演示前确认：代码和文档已推送到固定 commit、使用非 root 最小权限凭据、测试资源已批准、真实查询已预演、输出已做脱敏检查、清理责任人已明确。

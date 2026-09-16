@@ -107,7 +107,7 @@ Resolve expired authentication or missing service activation first. Switching cr
 
 Use least-privilege, preferably short-lived credentials. The AWS path calls GetCallerIdentity, DescribeAlarms, and FilterLogEvents. The BytePlus path calls GetMetricData and ListAlertGroup. Have the customer's administrator configure IAM permissions for the actual services, resources, and organization policies; this guide does not supply an unverified generic policy.
 
-**Security boundary:** ordinary config.env is readable configuration, not a vault. An Agent capable of executing scripts can also access these variables. Never place credentials in Skill source, system prompts, chat, setup-script source, Git, or screenshots. Do not use root credentials for a customer demo. The test identified the AWS principal as root; this must be replaced for future demonstrations.
+**Security boundary:** ordinary config.env is readable configuration, not a dedicated secret store. An Agent capable of executing scripts can also access these variables. Never place credentials in Skill source, system prompts, chat, setup-script source, Git, or screenshots. Do not use root credentials for a customer demo. The test identified the AWS principal as root; this must be replaced for future demonstrations.
 
 ## 5. Reproduction Walkthrough
 
@@ -330,23 +330,20 @@ Both deletions succeeded in this test; subsequent get calls reported that the re
 
 Deleting MA resources **does not revoke cloud keys or establish immediate removal from internal backups or logs**. Revoke temporary credentials or rotate previously shared long-lived keys according to the customer's security requirements.
 
-## 6. Complete Test History and Diagnosis
+## 6. Skill and config.env Test History
 
 | Stage | Test | Observation | Supported conclusion |
 | --- | --- | --- | --- |
 | 1. Skill packaging and loading | Upload five-file ZIP, execute scripts, install boto3 and BytePlus SDK | Loading and installation succeeded; self-test returned synthetic=true, live_query=false | Skill execution works; live connectivity is not yet verified |
 | 2. Missing credentials | Run a BytePlus query; add boolean-only credential-status | Credentials absent; live query failed; version 2 avoids printing environment values | Local SSO does not automatically supply monitoring credentials to MA |
 | 3. Local credential control | Use original credentials locally for AWS STS and BytePlus metrics | STS succeeded; BytePlus returned 29 real points | Original credentials were valid at that time; this is not an MA success |
-| 4. Vault environment variables | Inject the same credentials through a dedicated Vault | Variables present; AWS returned InvalidClientTokenId / UnrecognizedClientException; BytePlus returned InvalidAuthorization | These errors alone do not prove the original credentials expired |
-| 5. Non-secret canary | Compare original SHA256/HMAC with sandbox calculations using a random value with no service access | Both comparisons failed for the Vault value | The tested Vault mode did not expose the original signing value to the local SDK |
-| 6. HTTP echo control | Send canary headers/body to an echo service | HTTP 200; sandbox-observed echoes matched the sandbox value, not the original | Response-side remasking cannot be excluded; egress substitution is not conclusively established |
-| 7. config.env canary control | Inject a non-secret value directly through Environment config.env | Original-value and HMAC comparisons passed; Vault comparisons still failed | config.env supports original-value injection and local signing in this environment |
-| 8. Live config.env queries | Same Agent/Skill, dedicated Environment, real read-only calls to both clouds | BytePlus metrics/alerts and AWS identity/alarms/logs all succeeded | Direct Skill-based monitoring works without MCP |
-| 9. Evidence and cleanup | Retain sanitized events; delete temporary credential-bearing resources | Deletes succeeded; resources no longer retrievable; five local regression tests passed | Test completed; original cloud credentials still require separate lifecycle management |
+| 4. config.env canary validation | Inject a non-secret value directly through Environment config.env | Original-value and HMAC comparisons passed | config.env supports original-value injection and local signing in this environment |
+| 5. Live config.env queries | Dedicated Environment, Skill-enabled Agent, real read-only calls to both clouds | BytePlus metrics/alerts and AWS identity/alarms/logs all succeeded | Direct Skill-based monitoring works without MCP |
+| 6. Evidence and cleanup | Retain sanitized events; delete temporary credential-bearing resources | Deletes succeeded; resources no longer retrievable; five local regression tests passed | Test completed; original cloud credentials still require separate lifecycle management |
 
 Two implementation mistakes were corrected during the investigation. An early Agent attempted unsafe environment inspection when real credentials were absent; version 2 added the boolean-only check. One canary probe mistakenly treated config.env as a filename; that invalid result was discarded, and subsequent controls read os.environ.
 
-**Final diagnosis:** the limitation was not Skill support for cloud monitoring. Local SDK signing requires original AK/SK values, which the tested Vault path did not expose. The same Agent/Skill succeeded with config.env. This conclusion applies to the tested credential mode only; it does not establish that every Vault mode fails or fully characterize Vault's outbound substitution behavior.
+**Conclusion:** with runtime credentials supplied through config.env, the Skill can use SDKs to sign requests locally and retrieve real AWS and BytePlus monitoring data directly from MA, without an additional MCP server.
 
 ## 7. Customer Demo Flow and Talk Track
 
@@ -382,8 +379,8 @@ Production work remains: short-lived credential delivery and rotation, least-pri
 ## 9. References and Handoff Checklist
 
 - [MA Environment configuration](https://ai.byteplus.com/ark/region:ap-southeast-1/docs/ModelArk/2553721): used during this investigation to confirm config.env configuration.
-- [Detailed Skill validation notes](ma-monitoring-skill.md): English technical history with diagnostic Session references.
-- This guide: customer demo workflow and complete investigation, without real account keys or customer resource parameters.
+- [Chinese customer guide](ma-monitoring-skill-config-env-demo.zh-CN.md): the corresponding Skill + config.env walkthrough.
+- This guide: customer demo workflow and Skill + config.env test history, without real account keys or customer resource parameters.
 - Private sanitized events: retained for verification, not automatically bundled or published.
 
 Before presenting: push the required code and documentation at a fixed commit, use a non-root least-privilege identity, obtain approval for test resources, rehearse live queries, inspect output redaction, and assign responsibility for cleanup.
